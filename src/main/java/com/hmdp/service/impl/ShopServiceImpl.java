@@ -15,15 +15,15 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import java.util.concurrent.TimeUnit;
 
-import static com.hmdp.utils.RedisConstants.CACHE_SHOP_KEY;
+import static com.hmdp.utils.RedisConstants.*;
 
 /**
  * <p>
  * 服务实现类
  * </p>
  *
- * @author 虎哥
- * @since 2021-12-22
+ * @author xuxin
+ * @since 2024-04-03
  */
 @Service
 public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IShopService {
@@ -41,10 +41,17 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             Shop shop = JSONUtil.toBean(shopJson, Shop.class);
             return Result.ok(shop);
         }
+
+        // 判断命中的是否是空值
+        if ("".equals(shopJson)) {
+            return Result.fail("店铺不存在!");
+        }
         // 3.不存在，根据id查询数据库，此时若不存在返回错误，存在则写入redis
         Shop shop = getById(id);
 
         if (shop == null) {
+            // 解决缓存穿透问题，设置空值
+            stringRedisTemplate.opsForValue().set(key, "", CACHE_NULL_TTL ,TimeUnit.MINUTES);
             return Result.fail("店铺不存在!");
         }
         stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(shop), RedisConstants.CACHE_SHOP_TTL, TimeUnit.MINUTES);
