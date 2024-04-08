@@ -30,8 +30,8 @@ class HmDianPingApplicationTests {
 
     @Test
     void testSaveShop() {
-        Shop shop = shopService.getById(1L);
-        cacheClient.setWithLogicalExpire(CACHE_SHOP_KEY + 1L, shop, 10L, TimeUnit.SECONDS);
+        Shop shop = shopService.getById(2L);
+        cacheClient.setWithLogicalExpire(CACHE_SHOP_KEY + 2L, shop, 10L, TimeUnit.SECONDS);
     }
 
     private final ExecutorService es = Executors.newFixedThreadPool(500);
