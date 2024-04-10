@@ -65,6 +65,7 @@ public class CacheClient {
         }
 
         // 3.命中，需要json反序列化
+        // 3.命中，需要json反序列化
         RedisData redisData = JSONUtil.toBean(json, RedisData.class);
         R r = JSONUtil.toBean((JSONObject) redisData.getData(), type);
         LocalDateTime expireTime = redisData.getExpireTime();
