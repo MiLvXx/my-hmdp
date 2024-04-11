@@ -1,15 +1,17 @@
 package com.hmdp.service.impl;
 
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.SeckillVoucher;
 import com.hmdp.entity.VoucherOrder;
+import com.hmdp.lock.SimpleRedisLock;
 import com.hmdp.mapper.VoucherOrderMapper;
 import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.UserHolder;
 import org.springframework.aop.framework.AopContext;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,8 +23,8 @@ import java.time.LocalDateTime;
  * 服务实现类
  * </p>
  *
- * @author 虎哥
- * @since 2021-12-22
+ * @author xuxin
+ * @since 2024-04-10
  */
 @Service
 public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder> implements IVoucherOrderService {
@@ -31,7 +33,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     private ISeckillVoucherService seckillVoucherService;
     @Resource
     private RedisIdWorker redisIdWorker;
-
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
     @Override
     public Result seckillVoucher(Long voucherId) {
@@ -50,9 +53,18 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         }
         Long userId = UserHolder.getUser().getId();
         synchronized (userId.toString().intern()) { // 确保相同用户id对应同样的锁
-            // 获取代理对象(事务)
-            IVoucherOrderService proxy = ((IVoucherOrderService) AopContext.currentProxy());
-            return proxy.createVoucherOrder(voucherId, userId);
+            SimpleRedisLock lock = new SimpleRedisLock("order:" + userId, stringRedisTemplate);
+            boolean isLock = lock.tryLock(1200);
+            if (!isLock) {
+                return Result.fail("不允许重复下单");
+            }
+            try {
+                // 获取代理对象(事务)
+                IVoucherOrderService proxy = ((IVoucherOrderService) AopContext.currentProxy());
+                return proxy.createVoucherOrder(voucherId, userId);
+            } finally {
+                lock.unlock();
+            }
         }
     }
 
