@@ -1,8 +1,11 @@
 package com.hmdp.lock;
 
 import com.hmdp.utils.RedisConstants;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -15,6 +18,12 @@ public class SimpleRedisLock implements ILock {
 
     private final String name;
     private final StringRedisTemplate stringRedisTemplate;
+    private static final DefaultRedisScript<Long> UNLOCK_SCRIPT;
+    static {
+        UNLOCK_SCRIPT = new DefaultRedisScript<>();
+        UNLOCK_SCRIPT.setLocation(new ClassPathResource("unlock.lua"));
+        UNLOCK_SCRIPT.setResultType(Long.class);
+    }
 
     public SimpleRedisLock(String name, StringRedisTemplate stringRedisTemplate) {
         this.name = name;
@@ -34,13 +43,10 @@ public class SimpleRedisLock implements ILock {
 
     @Override
     public void unlock() {
-        String key = RedisConstants.LOCK_KEY + name;
-        String threadId = RedisConstants.ID_PREFIX + Thread.currentThread().getId();
-        // 判断是否与自己的锁一致
-        String id = stringRedisTemplate.opsForValue().get(key);
-        if (threadId.equals(id)) {
-            // release lock
-            stringRedisTemplate.delete(key);
-        }
+       // 调用lua脚本
+        stringRedisTemplate.execute(
+                UNLOCK_SCRIPT,
+                Collections.singletonList(RedisConstants.LOCK_KEY + name),
+                RedisConstants.ID_PREFIX + Thread.currentThread().getId());
     }
 }
