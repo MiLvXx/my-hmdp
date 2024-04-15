@@ -7,6 +7,7 @@
 -- 1.parameters list
 local voucherId = ARGV[1]
 local userId = ARGV[2]
+local orderId = ARGV[3]
 
 -- 2. data key
 local stockKey = 'seckill:stock:' .. voucherId
@@ -29,5 +30,7 @@ end
 -- 3.5 下单(保存用户) SADD orderKey userId
 redis.call('INCRBY', stockKey, -1)
 redis.call('SADD', orderKey, userId)
-
+-- 3.6 发送消息到队列: XADD stream.orders * k1 v1 k2 v2 ...
+redis.call('XADD', 'stream.orders', '*',
+        'userId', userId, 'voucherId', voucherId, 'id', orderId)
 return 0
